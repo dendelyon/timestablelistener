@@ -1,0 +1,542 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Times Table Listener</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #fdf8ef; --card: #ffffff; --ink: #2b2a33; --muted: #6b6878; --line: #ece4d6;
+    --accent: #ff7a45; --accent-2: #ffb347; --accent-ink: #ffffff;
+    --good: #1f8f5f; --good-bg: #e3f6ec; --bad: #d63a3f; --bad-bg: #fde8e8;
+    --pend-bg: #f5f1e9; --warn-bg: #fff4d6; --warn-ink: #7a5a00;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #1b1a20; --card: #25242c; --ink: #f2f0f5; --muted: #a6a3b1; --line: #37353f;
+      --good: #4fd394; --good-bg: #173a2a; --bad: #ff7b7f; --bad-bg: #43201f;
+      --pend-bg: #2e2c35; --warn-bg: #3d3416; --warn-ink: #ffd877;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--ink);
+    font-family: "Fredoka", system-ui, -apple-system, "Segoe UI", sans-serif;
+    font-size: 17px; line-height: 1.4;
+  }
+  .wrap { max-width: 920px; margin: 0 auto; padding: 20px 16px 48px; }
+  header { text-align: center; margin-bottom: 18px; }
+  h1 { font-size: 2rem; margin: 6px 0 2px; font-weight: 700; letter-spacing: -0.5px; }
+  h1 span { color: var(--accent); }
+  .sub { color: var(--muted); margin: 0; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 18px; padding: 18px; margin-bottom: 16px; }
+  h2 { font-size: 1.15rem; margin: 0 0 12px; font-weight: 600; }
+
+  .settings { display: flex; flex-wrap: wrap; gap: 14px; align-items: end; }
+  .settings label { display: flex; flex-direction: column; gap: 4px; font-size: 0.9rem; color: var(--muted); }
+  select, input[type=text] {
+    font: inherit; color: var(--ink); background: var(--pend-bg); border: 1px solid var(--line);
+    border-radius: 10px; padding: 8px 10px; min-width: 120px;
+  }
+  button { font: inherit; cursor: pointer; border: none; border-radius: 12px; }
+  .btn { background: var(--pend-bg); color: var(--ink); padding: 9px 14px; border: 1px solid var(--line); }
+  .btn:hover { filter: brightness(0.97); }
+
+  .mic-area { display: flex; flex-direction: column; align-items: center; gap: 12px; text-align: center; }
+  .mic {
+    width: 120px; height: 120px; border-radius: 50%;
+    background: linear-gradient(145deg, var(--accent), var(--accent-2)); color: var(--accent-ink);
+    font-size: 3rem; display: grid; place-items: center; box-shadow: 0 8px 20px rgba(255,122,69,.35);
+    transition: transform .15s;
+  }
+  .mic:hover { transform: scale(1.04); }
+  .mic.on { animation: pulse 1.4s infinite; background: linear-gradient(145deg, #e5484d, #ff7a45); }
+  @keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(229,72,77,.55); } 70% { box-shadow: 0 0 0 26px rgba(229,72,77,0); } 100% { box-shadow: 0 0 0 0 rgba(229,72,77,0); } }
+  .status { font-weight: 600; font-size: 1.1rem; }
+  .hint { color: var(--muted); font-size: 0.95rem; max-width: 560px; }
+  .live { min-height: 1.6em; font-size: 1.15rem; color: var(--muted); font-style: italic; }
+  .row { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; }
+  .timer { font-variant-numeric: tabular-nums; font-size: 1.05rem; color: var(--muted); }
+
+  .notice { background: var(--warn-bg); color: var(--warn-ink); border-radius: 12px; padding: 10px 14px; margin-bottom: 16px; display: none; }
+  .notice.show { display: block; }
+
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 10px; }
+  .cell { border-radius: 14px; padding: 12px; background: var(--pend-bg); border: 2px solid transparent; text-align: center; }
+  .cell .q { font-size: 1.25rem; font-weight: 600; }
+  .cell .a { font-size: 0.95rem; color: var(--muted); margin-top: 2px; }
+  .cell.correct { background: var(--good-bg); border-color: var(--good); }
+  .cell.correct .a { color: var(--good); font-weight: 600; }
+  .cell.wrong { background: var(--bad-bg); border-color: var(--bad); }
+  .cell.wrong .a { color: var(--bad); font-weight: 600; }
+  .cell.flash { animation: pop .4s; }
+  @keyframes pop { 50% { transform: scale(1.08); } }
+
+  .summary { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 4px; }
+  .stat { flex: 1; min-width: 140px; background: var(--pend-bg); border-radius: 14px; padding: 12px; text-align: center; }
+  .stat b { display: block; font-size: 1.8rem; }
+  .stat.g b { color: var(--good); } .stat.r b { color: var(--bad); }
+  .lists { margin-top: 12px; color: var(--muted); }
+  .lists p { margin: 4px 0; }
+  .celebrate { font-size: 1.3rem; font-weight: 600; text-align: center; margin: 10px 0 0; color: var(--good); }
+
+  .log { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; max-height: 320px; overflow-y: auto; }
+  .log li { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 8px 12px; border-radius: 10px; background: var(--pend-bg); }
+  .log li.ok { background: var(--good-bg); } .log li.no { background: var(--bad-bg); }
+  .log .heard { color: var(--muted); font-size: 0.85rem; flex-basis: 100%; }
+  .log .fix { margin-left: auto; font-size: 0.85rem; padding: 4px 10px; background: var(--card); border: 1px solid var(--line); color: var(--ink); border-radius: 8px; }
+  .empty { color: var(--muted); font-style: italic; }
+  .type-row { display: flex; gap: 8px; margin-top: 10px; }
+  .type-row input { flex: 1; min-width: 0; }
+  details summary { cursor: pointer; color: var(--muted); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div style="font-size:2.2rem">🎧✖️</div>
+    <h1>Times Table <span>Listener</span></h1>
+    <p class="sub">Say your times tables out loud and I'll check every answer.</p>
+  </header>
+
+  <div class="notice" id="notice"></div>
+
+  <div class="card">
+    <div class="settings">
+      <label>Times table
+        <select id="tableSel"></select>
+      </label>
+      <label>Go up to
+        <select id="maxSel">
+          <option value="10">× 10</option>
+          <option value="12" selected>× 12</option>
+          <option value="15">× 15</option>
+          <option value="20">× 20</option>
+        </select>
+      </label>
+      <label>Accent
+        <select id="langSel">
+          <option value="en-AU" selected>English (Australia)</option>
+          <option value="en-NZ">English (New Zealand)</option>
+          <option value="en-GB">English (UK)</option>
+          <option value="en-US">English (US)</option>
+          <option value="en-IN">English (India)</option>
+        </select>
+      </label>
+      <button class="btn" id="resetBtn">↺ Start over</button>
+    </div>
+  </div>
+
+  <div class="card mic-area">
+    <button class="mic" id="micBtn" aria-label="Start listening">🎤</button>
+    <div class="status" id="status">Tap the microphone and start reciting</div>
+    <div class="live" id="live"></div>
+    <div class="timer" id="timer">⏱ 0:00</div>
+    <div class="hint" id="hint">Say each one clearly, like <b>"one times seven is seven, two times seven is fourteen…"</b>. "Seven ones are seven" style works too. Pausing between each one helps.</div>
+    <div class="row">
+      <button class="btn" id="finishBtn">🏁 Finish &amp; see results</button>
+    </div>
+  </div>
+
+  <div class="card" id="gridCard">
+    <h2 id="gridTitle">Progress</h2>
+    <div class="grid" id="grid"></div>
+  </div>
+
+  <div class="card">
+    <h2>Results</h2>
+    <div class="summary">
+      <div class="stat g"><b id="nCorrect">0</b>correct</div>
+      <div class="stat r"><b id="nWrong">0</b>wrong</div>
+      <div class="stat"><b id="nLeft">0</b><span id="leftLabel">not said yet</span></div>
+    </div>
+    <div class="lists" id="lists"></div>
+    <div class="celebrate" id="celebrate"></div>
+  </div>
+
+  <div class="card">
+    <h2>What I heard</h2>
+    <ul class="log" id="log"><li class="empty">Nothing yet. Answers appear here as they're spoken.</li></ul>
+    <details style="margin-top:12px">
+      <summary>No microphone? Type what was said instead</summary>
+      <div class="type-row">
+        <input type="text" id="typeIn" placeholder="e.g. 3 times 7 is 21, 4 times 7 is 27">
+        <button class="btn" id="typeBtn">Check</button>
+      </div>
+    </details>
+  </div>
+</div>
+
+<script id="parser">
+// ---------- Turning speech into numbers ----------
+const SMALL = { zero:0, one:1, won:1, two:2, to:2, too:2, three:3, four:4, for:4, fore:4, five:5, six:6,
+  seven:7, eight:8, ate:8, nine:9, ten:10, eleven:11, twelve:12, thirteen:13, fourteen:14, fifteen:15,
+  sixteen:16, seventeen:17, eighteen:18, nineteen:19 };
+const TENS = { twenty:20, thirty:30, forty:40, fourty:40, fifty:50, sixty:60, seventy:70, eighty:80, ninety:90 };
+
+function wordVal(w) {
+  if (w in SMALL) return ['u', SMALL[w]];
+  if (w in TENS) return ['t', TENS[w]];
+  if (w === 'hundred') return ['h', 100];
+  return null;
+}
+function lookup(w) {
+  let r = wordVal(w);
+  if (r) return r;
+  if (w.endsWith('es')) { r = wordVal(w.slice(0, -2)); if (r && r[0] === 'u') return r; } // sixes
+  if (w.endsWith('s')) { r = wordVal(w.slice(0, -1)); if (r && r[0] !== 'h') return r; }  // sevens, twelves
+  return null;
+}
+
+function extractNumbers(text) {
+  const t = String(text).toLowerCase()
+    .replace(/(\d)\s*[x×✕*]\s*(?=\d)/g, '$1 times ')
+    .replace(/\b(is )?equals? to\b/g, ' equals ')
+    .replace(/\bequal to\b/g, ' equals ')
+    .replace(/-/g, ' ');
+  const toks = t.split(/[^a-z0-9]+/).filter(Boolean);
+  const out = [];
+  let cur = null; // { v: value, k: last kind }
+  const flush = () => { if (cur) { out.push(cur.v); cur = null; } };
+  for (let i = 0; i < toks.length; i++) {
+    const w = toks[i];
+    if (/^\d+$/.test(w)) { flush(); out.push(parseInt(w, 10)); continue; }
+    if (w === 'a' && toks[i + 1] === 'hundred') { flush(); cur = { v: 1, k: 'u' }; continue; }
+    const r = lookup(w);
+    if (!r) {
+      if (w === 'and' && cur && cur.k === 'h') continue; // "one hundred and twenty"
+      flush(); continue;
+    }
+    const [kind, n] = r;
+    if (kind === 'u') {
+      if (cur && cur.k === 't' && cur.v % 10 === 0) { cur.v += n; cur.k = 'd'; }
+      else if (cur && cur.k === 'h') { cur.v += n; cur.k = 'd'; }
+      else { flush(); cur = { v: n, k: 'u' }; }
+    } else if (kind === 't') {
+      if (cur && cur.k === 'h') { cur.v += n; cur.k = 't'; }
+      else { flush(); cur = { v: n, k: 't' }; }
+    } else { // hundred
+      if (cur && cur.k === 'u' && cur.v < 10) { cur.v *= 100; cur.k = 'h'; }
+      else { flush(); cur = { v: 100, k: 'h' }; }
+    }
+  }
+  flush();
+  return out;
+}
+
+// cfg: { table: number (0 = any table), max: number }
+function isPair(a, b, cfg) {
+  if (a == null || b == null) return false;
+  const inRange = x => x >= 1 && x <= cfg.max;
+  if (cfg.table) return (a === cfg.table && inRange(b)) || (b === cfg.table && inRange(a));
+  return inRange(a) && inRange(b);
+}
+
+// Reads a list of numbers and finds "a × b = c" statements.
+// Returns what it found plus the numbers it should hold on to until more speech arrives.
+function parseNumbers(nums, cfg, final) {
+  const statements = [], missing = [];
+  let i = 0;
+  while (true) {
+    const left = nums.length - i;
+    if (left < 3) {
+      if (final) {
+        if (left === 2 && isPair(nums[i], nums[i + 1], cfg)) missing.push({ a: nums[i], b: nums[i + 1] });
+        i = nums.length;
+      }
+      break;
+    }
+    const a = nums[i], b = nums[i + 1], c = nums[i + 2];
+    if (!isPair(a, b, cfg)) { i++; continue; }
+    if (c !== a * b) {
+      if (left >= 5) {
+        // Was the answer dropped? e.g. "3 times 7 ... 4 times 7 is 28"
+        if (isPair(c, nums[i + 3], cfg) && nums[i + 4] === c * nums[i + 3]) {
+          missing.push({ a, b }); i += 2; continue;
+        }
+      } else if (!final) break; // wait for more speech before marking it wrong
+    }
+    statements.push({ a, b, said: c, correct: c === a * b });
+    i += 3;
+  }
+  return { statements, missing, rest: nums.slice(i) };
+}
+</script>
+
+<script>
+// ---------- App ----------
+const $ = id => document.getElementById(id);
+const tableSel = $('tableSel'), maxSel = $('maxSel'), langSel = $('langSel');
+
+for (let n = 1; n <= 20; n++) {
+  const o = document.createElement('option');
+  o.value = n; o.textContent = n + ' times table';
+  if (n === 7) o.selected = true;
+  tableSel.appendChild(o);
+}
+const anyOpt = document.createElement('option');
+anyOpt.value = 0; anyOpt.textContent = 'Mixed (any table)';
+tableSel.appendChild(anyOpt);
+
+const cfg = () => ({ table: parseInt(tableSel.value, 10), max: parseInt(maxSel.value, 10) });
+
+let results = {};     // single table: multiplier -> { said, correct, fixed }
+let mixed = [];       // mixed mode: list of { a, b, said, correct }
+let logItems = [];
+let pending = [];     // numbers heard but not yet matched into a full statement
+let pendingText = '';
+let flushTimer = null;
+let timerStart = null, timerElapsed = 0, timerTick = null;
+let finished = false;
+
+function resetAll() {
+  results = {}; mixed = []; logItems = []; pending = []; pendingText = '';
+  finished = false; timerStart = null; timerElapsed = 0;
+  clearInterval(timerTick); updateTimer();
+  $('live').textContent = '';
+  render();
+}
+
+// ----- Feeding text in -----
+function feed(text, final) {
+  pendingText = (pendingText + ' ' + text).trim();
+  pending.push(...extractNumbers(text));
+  process(!!final);
+  clearTimeout(flushTimer);
+  if (!final) flushTimer = setTimeout(() => process(true), 2500);
+}
+
+function process(final) {
+  const c = cfg();
+  const { statements, missing, rest } = parseNumbers(pending, c, final);
+  const heard = pendingText;
+  statements.forEach(s => record(s, heard, c));
+  missing.forEach(m => addLog({ type: 'missing', a: m.a, b: m.b, heard }));
+  pending = rest;
+  if (statements.length || missing.length || final) pendingText = rest.length ? pendingText : '';
+  render();
+}
+
+function record(s, heard, c) {
+  if (finished) return;
+  if (c.table) {
+    const m = s.a === c.table ? s.b : s.a;
+    results[m] = { said: s.said, correct: s.correct, fixed: false };
+    addLog({ type: 'answer', a: s.a, b: s.b, said: s.said, correct: s.correct, m, heard });
+    flashCell(m);
+  } else {
+    mixed.push({ ...s });
+    addLog({ type: 'answer', a: s.a, b: s.b, said: s.said, correct: s.correct, idx: mixed.length - 1, heard });
+  }
+}
+
+function addLog(item) { logItems.unshift(item); }
+
+function markRight(i) {
+  const item = logItems[i];
+  if (!item || item.correct) return;
+  item.correct = true; item.fixed = true;
+  if (item.m != null && results[item.m]) { results[item.m] = { said: item.a * item.b, correct: true, fixed: true }; }
+  if (item.idx != null && mixed[item.idx]) { mixed[item.idx].correct = true; }
+  render();
+}
+
+// ----- Rendering -----
+let toFlash = null;
+function flashCell(m) { toFlash = m; }
+
+function render() {
+  const c = cfg();
+  const grid = $('grid');
+  grid.innerHTML = '';
+  $('gridCard').style.display = c.table ? '' : 'none';
+  $('gridTitle').textContent = c.table ? `The ${c.table} times table` : 'Progress';
+
+  if (c.table) {
+    for (let m = 1; m <= c.max; m++) {
+      const r = results[m];
+      const el = document.createElement('div');
+      el.className = 'cell' + (r ? (r.correct ? ' correct' : ' wrong') : '') + (toFlash === m ? ' flash' : '');
+      const q = `${m} × ${c.table}`;
+      let a = '= ?';
+      if (r && r.correct) a = `= ${m * c.table} ✓`;
+      else if (r) a = `said ${r.said} ✗`;
+      el.innerHTML = `<div class="q">${q}</div><div class="a">${a}</div>`;
+      grid.appendChild(el);
+    }
+  }
+  toFlash = null;
+
+  // Summary
+  let nC = 0, nW = 0, wrongList = [], leftList = [];
+  if (c.table) {
+    for (let m = 1; m <= c.max; m++) {
+      const r = results[m];
+      if (!r) leftList.push(`${m} × ${c.table}`);
+      else if (r.correct) nC++;
+      else { nW++; wrongList.push(`${m} × ${c.table} = ${m * c.table} (said ${r.said})`); }
+    }
+    $('nLeft').textContent = leftList.length;
+    $('leftLabel').textContent = 'not said yet';
+  } else {
+    mixed.forEach(s => { if (s.correct) nC++; else { nW++; wrongList.push(`${s.a} × ${s.b} = ${s.a * s.b} (said ${s.said})`); } });
+    $('nLeft').textContent = mixed.length;
+    $('leftLabel').textContent = 'answers heard';
+  }
+  $('nCorrect').textContent = nC;
+  $('nWrong').textContent = nW;
+
+  let html = '';
+  if (wrongList.length) html += `<p><b>To practise:</b> ${wrongList.join(' · ')}</p>`;
+  if (finished && leftList.length) html += `<p><b>Skipped / not heard:</b> ${leftList.join(' · ')}</p>`;
+  $('lists').innerHTML = html;
+
+  let cel = '';
+  if (c.table && nC === c.max) cel = `🎉 Perfect! All ${c.max} correct in ${fmtTime(currentElapsed())}! 🌟`;
+  else if (finished && (nC + nW) > 0) {
+    const total = c.table ? c.max : (nC + nW);
+    const pct = Math.round((nC / total) * 100);
+    cel = pct >= 80 ? `Great work! ${nC} out of ${total} ⭐` : `${nC} out of ${total}. Keep practising, you've got this! 💪`;
+  }
+  $('celebrate').textContent = cel;
+  if (c.table && nC === c.max && !finished) finish(true);
+
+  // Log
+  const log = $('log');
+  if (!logItems.length) {
+    log.innerHTML = '<li class="empty">Nothing yet. Answers appear here as they\'re spoken.</li>';
+  } else {
+    log.innerHTML = '';
+    logItems.forEach((it, i) => {
+      const li = document.createElement('li');
+      if (it.type === 'missing') {
+        li.innerHTML = `<span>🤔 Heard <b>${it.a} × ${it.b}</b> but didn't catch an answer. Try that one again.</span>`;
+      } else if (it.correct) {
+        li.className = 'ok';
+        li.innerHTML = `<span>✅ <b>${it.a} × ${it.b} = ${it.a * it.b}</b>${it.fixed ? ' (marked right)' : ''}</span>`;
+      } else {
+        li.className = 'no';
+        li.innerHTML = `<span>❌ <b>${it.a} × ${it.b}</b>: said ${it.said}, the answer is <b>${it.a * it.b}</b></span>
+          <button class="fix" data-i="${i}">I misheard, mark right</button>`;
+      }
+      if (it.heard) {
+        const h = document.createElement('div');
+        h.className = 'heard';
+        h.textContent = '“' + it.heard + '”';
+        li.appendChild(h);
+      }
+      log.appendChild(li);
+    });
+    log.querySelectorAll('.fix').forEach(b => b.onclick = () => markRight(+b.dataset.i));
+  }
+}
+
+// ----- Timer -----
+function currentElapsed() { return timerElapsed + (timerStart ? Date.now() - timerStart : 0); }
+function fmtTime(ms) { const s = Math.floor(ms / 1000); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`; }
+function updateTimer() { $('timer').textContent = '⏱ ' + fmtTime(currentElapsed()); }
+function startTimer() { if (timerStart) return; timerStart = Date.now(); clearInterval(timerTick); timerTick = setInterval(updateTimer, 250); }
+function pauseTimer() { if (timerStart) { timerElapsed += Date.now() - timerStart; timerStart = null; } clearInterval(timerTick); updateTimer(); }
+
+// ----- Speech recognition -----
+const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+let rec = null, listening = false;
+
+function showNotice(msg) { const n = $('notice'); n.innerHTML = msg; n.classList.add('show'); }
+function setStatus(t) { $('status').textContent = t; }
+
+if (!SR) {
+  showNotice('This browser can\'t do speech recognition. Please open this file in <b>Google Chrome</b>, <b>Microsoft Edge</b> or <b>Safari</b>. You can still type answers at the bottom of the page.');
+  $('micBtn').style.opacity = 0.5;
+}
+
+function startListening() {
+  if (!SR) return;
+  if (finished) resetAll();
+  rec = new SR();
+  rec.lang = langSel.value;
+  rec.continuous = true;
+  rec.interimResults = true;
+  rec.maxAlternatives = 1;
+  rec.onresult = e => {
+    let interim = '';
+    for (let i = e.resultIndex; i < e.results.length; i++) {
+      const r = e.results[i];
+      if (r.isFinal) feed(r[0].transcript, false);
+      else interim += r[0].transcript;
+    }
+    $('live').textContent = interim ? '“' + interim + '”' : '';
+  };
+  rec.onerror = e => {
+    if (e.error === 'not-allowed' || e.error === 'service-not-allowed') {
+      listening = false;
+      showNotice('The microphone is blocked. Click the 🔒 or 🎤 icon in the address bar, allow the microphone, then tap the mic button again.');
+    } else if (e.error === 'network') {
+      listening = false;
+      showNotice('Speech recognition needs an internet connection (the browser sends audio to its speech service). Check your connection and try again.');
+    } else if (e.error === 'audio-capture') {
+      listening = false;
+      showNotice('No microphone was found. Plug one in or check your sound settings.');
+    }
+  };
+  rec.onend = () => {
+    if (listening) { try { rec.start(); } catch (_) {} return; }
+    process(true);
+    updateMicUI();
+  };
+  try { rec.start(); } catch (_) {}
+  listening = true;
+  startTimer();
+  updateMicUI();
+}
+
+function stopListening() {
+  listening = false;
+  pauseTimer();
+  if (rec) { try { rec.stop(); } catch (_) {} }
+  setTimeout(() => process(true), 600);
+  updateMicUI();
+}
+
+function updateMicUI() {
+  const b = $('micBtn');
+  b.classList.toggle('on', listening);
+  b.textContent = listening ? '⏸' : '🎤';
+  b.setAttribute('aria-label', listening ? 'Pause listening' : 'Start listening');
+  if (listening) setStatus('Listening… start reciting!');
+  else if (finished) setStatus('All done! Tap the mic to go again.');
+  else setStatus(timerElapsed ? 'Paused. Tap the mic to carry on.' : 'Tap the microphone and start reciting');
+}
+
+function finish(auto) {
+  if (listening) stopListening();
+  else process(true);
+  pauseTimer();
+  finished = true;
+  updateMicUI();
+  render();
+}
+
+$('micBtn').onclick = () => listening ? stopListening() : startListening();
+$('finishBtn').onclick = () => finish(false);
+$('resetBtn').onclick = () => { if (listening) stopListening(); resetAll(); updateMicUI(); };
+tableSel.onchange = maxSel.onchange = () => { if (listening) stopListening(); resetAll(); updateMicUI(); };
+langSel.onchange = () => { if (listening) { stopListening(); setTimeout(startListening, 700); } };
+
+function submitTyped() {
+  const v = $('typeIn').value.trim();
+  if (!v) return;
+  if (finished) resetAll();
+  startTimer();
+  feed(v, true);
+  $('typeIn').value = '';
+}
+$('typeBtn').onclick = submitTyped;
+$('typeIn').addEventListener('keydown', e => { if (e.key === 'Enter') submitTyped(); });
+
+resetAll();
+</script>
+</body>
+</html>
